@@ -1,6 +1,6 @@
 {
     "name": "ESP-IDF (ESP32-H2/Thread)",
-    "image": "espressif/idf:release-v5.1", 
+    "image": "espressif/idf:release-v5.5", 
     "customizations": {
         "vscode": {
             "extensions": [
