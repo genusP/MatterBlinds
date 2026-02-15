@@ -1,0 +1,18 @@
+{
+    "name": "ESP-IDF (ESP32-H2/Thread)",
+    "image": "espressif/idf:release-v5.1", 
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "espressif.esp-idf-extension",
+                "wokwi.wokwi-vscode",
+                "ms-vscode.cpptools"
+            ]
+        }
+    },
+    "postCreateCommand": "bash install.sh",
+    "remoteUser": "vscode",
+    "features": {
+        "ghcr.io/devcontainers/features/common-utils:1": {}
+    }
+}
