@@ -1,0 +1,8 @@
+# Name,   Type, SubType, Offset,  Size, Flags
+nvs,      data, nvs,     ,        0x6000,
+otadata,  data, ota,     ,        0x2000,
+phy_init, data, phy,     ,        0x1000,
+# Раздел для хранения настроек Matter (обязательно!)
+fctry,    data, nvs,     ,        0x6000,
+# Основной раздел приложения (увеличиваем до 2.5 МБ)
+factory,  app,  factory, ,        0x280000,

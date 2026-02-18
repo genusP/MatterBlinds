@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "gdbtarget",
+      "request": "attach",
+      "name": "Eclipse CDT GDB Adapter"
+    },
+    {
+      "name": "Wokwi GDB",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/matter-blinds.elf",
+      "cwd": "${workspaceFolder}",
+      "MIMode": "gdb",
+      "miDebuggerPath": "${command:espIdf.getToolchainGdb}",
+      "miDebuggerServerAddress": "localhost:3333"
+    }
+  ]
+}

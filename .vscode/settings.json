@@ -1,16 +1,13 @@
 {
-    "autoHide.hideSideBarsOnDebug": false,
-    "autoHide.hidePanelOnDebug": false,
-    "git.autoRepositoryDetection": false,
-    "git.scanRepositories": [
-        "${workspaceFolder}"
-    ],
-    "search.exclude": {
-        "**/esp-matter": true,
-        "**/build": true
-    },
-    "files.exclude": {
-        "**/esp-matter": false,
-        "**/build": true
-    }
+  "autoHide.hideSideBarsOnDebug": false,
+  "autoHide.hidePanelOnDebug": false,
+  "idf.customExtraVars": {
+    "IDF_TARGET": "esp32s3"
+  },
+  "[json]": {
+    "editor.formatOnSave": false
+  },
+  "idf.openOcdConfigs": [
+    "board/esp32s3-builtin.cfg"
+  ]
 }

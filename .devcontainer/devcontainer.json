@@ -1,17 +1,24 @@
 {
-    "name": "ESP-IDF (ESP32-H2/Thread)",
-    "image": "espressif/idf:release-v5.5", 
-    "customizations": {
-        "vscode": {
-            "extensions": [
-                "espressif.esp-idf-extension",
-                "wokwi.wokwi-vscode",
-                "ms-vscode.cpptools"
-            ]
-        }
-    },
-    "#postCreateCommand": "bash install.sh",
-    "features": {
-        "ghcr.io/devcontainers/features/common-utils:1": {}
-    }
+	"name": "ESP-IDF QEMU",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"terminal.integrated.defaultProfile.linux": "bash",
+				"idf.espIdfPath": "/opt/esp/idf",
+				"idf.toolsPath": "/opt/esp",
+				"idf.gitPath": "/usr/bin/git"
+			},
+			"extensions": [
+				"espressif.esp-idf-extension@1.11.1",
+				"Wokwi.wokwi-vscode",
+				"ms-vscode.cpptools"
+			]
+		}
+	},
+	"runArgs": [
+		"--privileged"
+	]
 }

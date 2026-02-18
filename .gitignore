@@ -1,2 +1,5 @@
-esp-matter/
+managed_components/
 build/
+sdkconfig.old
+sdkconfig
+dependencies.lock

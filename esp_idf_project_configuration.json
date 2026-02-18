@@ -1,0 +1,42 @@
+{
+  "esp32h2": {
+    "build": {
+      "compileArgs": [],
+      "ninjaArgs": [],
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.matter",
+        "sdkconfig.thread",
+        "sdkconfig.defaults.esp32h2"
+      ]
+    },
+    "env": {
+      "IDF_TARGET": "esp32h2"
+    },
+    "openOCD": {
+      "configs": [],
+      "args": []
+    },
+    "tasks": {}
+  },
+  "esp32s3-wifi": {
+    "build": {
+      "compileArgs": [],
+      "ninjaArgs": [],
+      "sdkconfigDefaults": [
+        "sdkconfig.defaults",
+        "sdkconfig.matter",
+        "sdkconfig.defaults.esp32s3"
+      ]
+    },
+    "env": {
+      "IDF_TARGET": "esp32s3"
+    },
+    "idfTarget": "esp32s3",
+    "openOCD": {
+      "configs": [],
+      "args": []
+    },
+    "tasks": {}
+  }
+}
