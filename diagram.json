@@ -3,16 +3,42 @@
   "author": "User",
   "editor": "wokwi",
   "parts": [
+    { "type": "board-esp32-s3-devkitc-1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    { "type": "wokwi-potentiometer", "id": "pot1", "top": -39.7, "left": -144.2, "attrs": {} },
     {
-      "type": "board-esp32-s3-devkitc-1",
-      "id": "esp",
-      "top": 0,
-      "left": 0,
-      "attrs": { "builder": "esp-idf" }
-    }
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 40,
+      "left": 350,
+      "attrs": { "label": "UP" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn2",
+      "top": 140,
+      "left": 350,
+      "attrs": { "label": "DOWN" }
+    },
+    { "type": "wokwi-stepper-motor", "id": "stepper", "top": 260, "left": 350, "attrs": {} },
+    { "type": "wokwi-vcc", "id": "vcc1", "top": 231.16, "left": 288, "attrs": {} },
+    { "type": "wokwi-gnd", "id": "gnd1", "top": 288, "left": 287.4, "attrs": {} }
   ],
   "connections": [
-     [ "esp:TX", "$serialMonitor:RX", "", [ ] ],
-     [ "esp:RX", "$serialMonitor:TX", "", [ ] ]
-  ]
+    [ "pot1:VCC", "esp:1", "orange", [] ],
+    [ "pot1:SIG", "esp:2", "blue", [] ],
+    [ "pot1:GND", "esp:GND.1", "black", [] ],
+    [ "btn1:1.l", "esp:4", "green", [] ],
+    [ "btn1:2.r", "esp:GND.1", "black", [] ],
+    [ "btn2:1.l", "esp:5", "green", [] ],
+    [ "btn2:2.r", "esp:GND.1", "black", [] ],
+    [ "stepper:A-", "esp:12", "purple", [] ],
+    [ "stepper:A+", "esp:13", "purple", [] ],
+    [ "stepper:B-", "esp:14", "purple", [] ],
+    [ "stepper:B+", "esp:15", "purple", [] ],
+    [ "stepper:VCC", "vcc1:VCC", "red", [] ],
+    [ "stepper:GND", "gnd1:GND", "black", [] ],
+    [ "vcc1:VCC", "esp:5V", "red", [] ],
+    [ "gnd1:GND", "esp:GND.2", "black", [] ]
+  ],
+  "dependencies": {}
 }

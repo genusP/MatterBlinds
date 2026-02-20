@@ -1,0 +1,304 @@
+# Конфигурация для проекта MatterBlinds
+
+menu "Конфигурация датчика положения"
+
+config POSITION_SENSOR_ADC_PIN
+    int "ADC пин для датчика положения"
+    range 0 39
+    default 4
+    help
+        Номер GPIO пина для ADC входа от потенциометра.
+        Должен быть пин с поддержкой ADC.
+
+config POSITION_SENSOR_POWER_PIN
+    int "Пин питания для датчика положения"
+    range 0 39
+    default 5
+    help
+        Номер GPIO пина для питания потенциометра.
+        Этот пин будет устанавливаться в HIGH только во время измерений
+        для снижения энергопотребления.
+
+config POSITION_SENSOR_ADC_UNIT
+    int "ADC блок"
+    range 1 2
+    default 1
+    help
+        Блок ADC для использования (1 для ADC1, 2 для ADC2).
+
+config POSITION_SENSOR_ADC_CHANNEL
+    int "ADC канал"
+    range 0 10
+    default 3
+    help
+        Номер ADC канала для датчика положения.
+
+config POSITION_SENSOR_ADC_ATTENUATION
+    int "Ослабление ADC"
+    range 0 3
+    default 3
+    help
+        Уровень ослабления ADC:
+        0 = 0 dB ослабление (диапазон 1.1V)
+        1 = 2.5 dB ослабление (диапазон 1.5V)
+        2 = 6 dB ослабление (диапазон 2.2V)
+        3 = 11 dB ослабление (диапазон 3.9V)
+
+config POSITION_SENSOR_STABILIZATION_MS
+    int "Время стабилизации питания"
+    range 1 100
+    default 10
+    help
+        Время в миллисекундах для ожидания после включения питания датчика
+        перед снятием показаний.
+
+config ZEBRA_BLINDS_SUPPORT
+    bool "Поддержка штор зебра"
+    default n
+    help
+        Включить поддержку штор зебра с дополнительной калибровкой смещения.
+        При включении добавляется третий этап калибровки для установки смещения.
+
+endmenu
+
+menu "Конфигурация внешней интеграции"
+
+config EXTERNAL_INTEGRATION
+    int "Тип внешней интеграции"
+    range 0 2
+    default 0
+    help
+        Выберите тип внешней интеграции:
+        0 - Нет (без внешней интеграции)
+        1 - Matter (интеграция с Matter/Thread)
+        2 - MQTT (интеграция с MQTT брокером)
+
+config ENABLE_MATTER_INTEGRATION
+    bool "Включить Matter интеграцию"
+    default n
+    depends on EXTERNAL_INTEGRATION = 1
+    help
+        Включить поддержку Matter/Thread интеграции.
+        Автоматически включается при выборе Matter режима.
+
+config ENABLE_MQTT_INTEGRATION
+    bool "Включить MQTT интеграцию"
+    default n
+    depends on EXTERNAL_INTEGRATION = 2
+    help
+        Включить поддержку MQTT интеграции.
+        Автоматически включается при выборе MQTT режима.
+
+config MQTT_BROKER_HOST
+    string "MQTT брокер хост"
+    default "192.168.1.100"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        IP адрес или доменное имя MQTT брокера.
+
+config MQTT_BROKER_PORT
+    int "MQTT брокер порт"
+    range 1 65535
+    default 1883
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Порт MQTT брокера (обычно 1883 для незащищенного, 8883 для SSL).
+
+config MQTT_CLIENT_ID
+    string "MQTT клиент ID"
+    default "matter_blinds"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Уникальный идентификатор клиента для MQTT брокера.
+
+config MQTT_USERNAME
+    string "MQTT имя пользователя"
+    default ""
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Имя пользователя для аутентификации на MQTT брокере.
+        Оставьте пустым если аутентификация не требуется.
+
+config MQTT_PASSWORD
+    string "MQTT пароль"
+    default ""
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Пароль для аутентификации на MQTT брокере.
+        Оставьте пустым если аутентификация не требуется.
+
+config MQTT_TOPIC_POSITION
+    string "MQTT топик позиции"
+    default "matterblinds/position"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Топик для публикации текущей позиции штор.
+
+config MQTT_TOPIC_MOVEMENT
+    string "MQTT топик движения"
+    default "matterblinds/movement"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Топик для публикации статуса движения штор.
+
+config MQTT_TOPIC_COMMAND
+    string "MQTT топик команд"
+    default "matterblinds/command"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Топик для подписки на команды управления шторами.
+
+config MQTT_TOPIC_STATE
+    string "MQTT топик состояния"
+    default "matterblinds/state"
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Топик для публикации состояния штор (open/closed/opening/closing).
+
+config MQTT_USE_SSL
+    bool "Использовать SSL для MQTT"
+    default n
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Включить защищенное соединение с MQTT брокером через SSL/TLS.
+
+config MQTT_HA_DISCOVERY_ENABLED
+    bool "Включить Home Assistant MQTT Discovery"
+    default y
+    depends on ENABLE_MQTT_INTEGRATION
+    help
+        Автоматически публиковать конфигурацию для автообнаружения в Home Assistant.
+        Устройство будет автоматически добавлено в Home Assistant какcover (шторы).
+
+config MQTT_HA_DEVICE_NAME
+    string "Имя устройства для Home Assistant"
+    default "Matter Blinds"
+    depends on MQTT_HA_DISCOVERY_ENABLED
+    help
+        Имя устройства которое будет отображаться в Home Assistant.
+
+config MQTT_HA_DEVICE_ID
+    string "ID устройства для Home Assistant"
+    default "matter_blinds_001"
+    depends on MQTT_HA_DISCOVERY_ENABLED
+    help
+        Уникальный идентификатор устройства для Home Assistant.
+        Должен быть уникальным для каждого устройства.
+
+config MQTT_HA_COVER_NAME
+    string "Имя cover для Home Assistant"
+    default "Blinds"
+    depends on MQTT_HA_DISCOVERY_ENABLED
+    help
+        Имя cover (штор) которое будет отображаться в Home Assistant.
+
+config MQTT_HA_DISCOVERY_PREFIX
+    string "Префикс для Home Assistant Discovery"
+    default "homeassistant"
+    depends on MQTT_HA_DISCOVERY_ENABLED
+    help
+        Префикс для топиков автообнаружения Home Assistant.
+        Обычно используется "homeassistant".
+
+endmenu
+
+menu "Конфигурация мотора управления"
+
+config MOTOR_PIN_1
+    int "GPIO пин для мотора IN1"
+    range 0 39
+    default 13
+    help
+        Номер GPIO пина для первого вывода ULN2003 (IN1).
+
+config MOTOR_PIN_2
+    int "GPIO пин для мотора IN2"
+    range 0 39
+    default 15
+    help
+        Номер GPIO пина для второго вывода ULN2003 (IN2).
+
+config MOTOR_PIN_3
+    int "GPIO пин для мотора IN3"
+    range 0 39
+    default 12
+    help
+        Номер GPIO пина для третьего вывода ULN2003 (IN3).
+
+config MOTOR_PIN_4
+    int "GPIO пин для мотора IN4"
+    range 0 39
+    default 14
+    help
+        Номер GPIO пина для четвертого вывода ULN2003 (IN4).
+
+config MOTOR_ENABLE_PIN
+    int "GPIO пин для enable мотора"
+    range -1 39
+    default -1
+    help
+        Номер GPIO пина для включения питания мотора.
+        Установите -1 если не используется.
+
+config MOTOR_DEFAULT_SPEED
+    int "Скорость мотора по умолчанию"
+    range 1 100
+    default 50
+    help
+        Скорость мотора по умолчанию (1-100, где 1 - медленно, 100 - быстро).
+
+config MOTOR_USE_HALF_STEP
+    bool "Использовать полушаговый режим"
+    default y
+    help
+        Включить полушаговый режим для более плавного движения.
+        Отключите для полношагового режима (больше крутящий момент).
+
+config MOTOR_DISABLE_ON_STOP
+    bool "Выключать мотор при остановке"
+    default y
+    help
+        Выключать питание мотора при остановке для экономии энергии.
+        Мотор будет удерживать позицию если отключено.
+
+config MOTOR_STEPS_PER_REVOLUTION
+    int "Шагов на оборот"
+    range 96 4096
+    default 2048
+    help
+        Количество шагов на полный оборот для используемого шагового двигателя.
+        Для 28BYJ-48 обычно 2048.
+
+endmenu
+
+menu "Конфигурация кнопок"
+
+config BUTTON_UP_PIN
+    int "GPIO пин для кнопки ВВЕРХ"
+    range 0 39
+    default 0
+    help
+        Номер GPIO пина для кнопки движения вверх.
+
+config BUTTON_DOWN_PIN
+    int "GPIO пин для кнопки ВНИЗ"
+    range 0 39
+    default 2
+    help
+        Номер GPIO пина для кнопки движения вниз.
+
+config BUTTON_LONG_PRESS_MS
+    int "Время для длинного нажатия"
+    range 500 5000
+    default 1000
+    help
+        Время в миллисекундах для распознавания длинного нажатия.
+
+config BUTTON_DEBOUNCE_MS
+    int "Время антидребезга"
+    range 10 200
+    default 50
+    help
+        Время в миллисекундах для подавления дребезга контактов.
+
+endmenu
