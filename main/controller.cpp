@@ -8,7 +8,7 @@
 static const char *TAG = "controller";
 
 // Кэш конфигурации
-static config_t g_config = {0};
+static config_t g_config = {};
 
 // Флаги состояния
 static bool g_button_held = false;
@@ -62,9 +62,9 @@ void controller_move_to_position(uint32_t position)
     ESP_LOGI(TAG, "Moving from position %lu to %lu", current_pos, position);
 
     // Определяем направление на основе текущей и целевой позиций
-    motor_direction_t direction = (position > current_pos
-                                   ? MOTOR_DIR_DOWN;
-                                   : MOTOR_DIR_UP);
+    motor_direction_t direction = position > current_pos
+                                      ? MOTOR_DIR_DOWN
+                                      : MOTOR_DIR_UP;
 
     // Устанавливаем направление мотора
     motor_set_direction(direction);

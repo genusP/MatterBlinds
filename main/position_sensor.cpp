@@ -41,13 +41,13 @@ static const char *get_calibration_step_description(calibration_step_t step)
 // Внутренние функции для управления питанием
 static void position_sensor_power_on(void)
 {
-    gpio_set_level(POSITION_SENSOR_POWER_PIN, 1);
+    gpio_set_level((gpio_num_t)POSITION_SENSOR_POWER_PIN, 1);
     vTaskDelay(pdMS_TO_TICKS(POSITION_SENSOR_STABILIZATION_MS));
 }
 
 static void position_sensor_power_off(void)
 {
-    gpio_set_level(POSITION_SENSOR_POWER_PIN, 0);
+    gpio_set_level((gpio_num_t)POSITION_SENSOR_POWER_PIN, 0);
 }
 
 void position_sensor_init(void)
@@ -64,11 +64,11 @@ void position_sensor_init(void)
     gpio_config(&io_conf);
 
     // Изначально выключаем питание
-    gpio_set_level(POSITION_SENSOR_POWER_PIN, 0);
+    gpio_set_level((gpio_num_t)POSITION_SENSOR_POWER_PIN, 0);
 
     // Инициализация ADC
     adc1_config_width(ADC_WIDTH_BIT_12);
-    adc1_config_channel_atten(POSITION_SENSOR_ADC_CHANNEL, POSITION_SENSOR_ADC_ATTENUATION);
+    adc1_config_channel_atten((adc1_channel_t)POSITION_SENSOR_ADC_CHANNEL, (adc_atten_t)POSITION_SENSOR_ADC_ATTENUATION);
 
     // Инициализация конфигурации
     position_config.min_position = 100;  // Минимальное значение ADC
@@ -93,7 +93,7 @@ uint32_t position_sensor_read(void)
     position_sensor_power_on();
 
     // Читаем ADC значение
-    int raw_value = adc1_get_raw(POSITION_SENSOR_ADC_CHANNEL);
+    int raw_value = adc1_get_raw((adc1_channel_t)POSITION_SENSOR_ADC_CHANNEL);
 
     // Выключаем питание
     position_sensor_power_off();

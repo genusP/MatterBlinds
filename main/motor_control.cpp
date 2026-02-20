@@ -93,7 +93,7 @@ void motor_control_init(void)
     motor_enable(true);
 
     // Создание задачи управления
-    xTaskCreate(motor_control_task, "motor_control", 2048, NULL, 5, &motor_state.task_handle);
+    xTaskCreate(motor_control_task, "motor_control", 2048, NULL, 5, &motor_state.motor_task_handle);
 
     ESP_LOGI(TAG, "Motor control initialized. Pins: IN1=%d, IN2=%d, IN3=%d, IN4=%d, EN=%d",
              MOTOR_PIN_1, MOTOR_PIN_2, MOTOR_PIN_3, MOTOR_PIN_4, MOTOR_ENABLE_PIN);
@@ -128,7 +128,7 @@ static void motor_enable(bool enable)
 {
     if (MOTOR_ENABLE_PIN >= 0)
     {
-        gpio_set_level(MOTOR_ENABLE_PIN, enable ? 1 : 0);
+        gpio_set_level((gpio_num_t)MOTOR_ENABLE_PIN, enable ? 1 : 0);
         motor_state.enable_pin_active = enable;
 
         // Небольшая задержка для стабилизации
@@ -169,10 +169,10 @@ static void motor_write_step(uint8_t step_index)
     }
 
     // Устанавливаем уровни на пины
-    gpio_set_level(MOTOR_PIN_1, step[0]);
-    gpio_set_level(MOTOR_PIN_2, step[1]);
-    gpio_set_level(MOTOR_PIN_3, step[2]);
-    gpio_set_level(MOTOR_PIN_4, step[3]);
+    gpio_set_level((gpio_num_t)MOTOR_PIN_1, step[0]);
+    gpio_set_level((gpio_num_t)MOTOR_PIN_2, step[1]);
+    gpio_set_level((gpio_num_t)MOTOR_PIN_3, step[2]);
+    gpio_set_level((gpio_num_t)MOTOR_PIN_4, step[3]);
 }
 
 static uint32_t calculate_delay_from_speed(uint32_t speed)

@@ -3,7 +3,7 @@
     {
       "name": "ESP-IDF",
       "compilerPath": "${config:idf.toolsPath}/tools/xtensa-esp-elf/esp-14.2.0_20241119/xtensa-esp-elf/bin/xtensa-esp32s3-elf-gcc",
-      "compileCommands": "/workspaces/esp32-h6/build/compile_commands.json",
+      "compileCommands": "/workspaces/MatterBlinds/build/compile_commands.json",
       "includePath": [
         "${workspaceFolder}/**"
       ],

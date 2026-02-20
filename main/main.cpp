@@ -2,6 +2,8 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "nvs_flash.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 // Условные включения интеграций
 #ifdef CONFIG_ENABLE_MATTER_INTEGRATION
