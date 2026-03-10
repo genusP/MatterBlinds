@@ -70,6 +70,12 @@ void update_state(controller_state_t state)
         ESP_LOGD(TAG, "Change controller state: %s -> %s", controller_state_text(old_state), controller_state_text(state));
         g_state = state;
 
+        // Добавляем задержку при переходе в IDLE для стабилизации датчика положения
+        if (state == IDLE && (old_state == MOVING_UP || old_state == MOVING_DOWN))
+        {
+            vTaskDelay(pdMS_TO_TICKS(100)); // Задержка 100мс для стабилизации датчика
+        }
+
         // Уведомляем всех подписчиков об изменении состояния
         for (uint8_t i = 0; i < g_state_subscribers.count; i++)
         {
@@ -184,7 +190,7 @@ void controller_move_up(void)
     if (is_moving_allowed())
     {
         ESP_LOGI(TAG, "Moving up");
-        motor_start_forward();
+        motor_start_reverce();
     }
 }
 
@@ -193,7 +199,7 @@ void controller_move_down(void)
     if (is_moving_allowed())
     {
         ESP_LOGI(TAG, "Moving down");
-        motor_start_reverce();
+        motor_start_forward();
     }
 }
 
@@ -235,7 +241,7 @@ void controller_set_position_percentage(float percentage)
         uint32_t min_pos = g_calibration_data.top_limit;
         uint32_t max_pos = g_calibration_data.bottom_limit;
         uint32_t range = max_pos - min_pos;
-        uint32_t target_position = min_pos + (uint32_t)(range * (100.0f - percentage) / 100.0f);
+        uint32_t target_position = min_pos + (uint32_t)(range * percentage / 100.0f);
 
         ESP_LOGI(TAG, "Setting position %.1f%% (ADC: %lu, range: %lu-%lu)",
                  percentage, target_position, min_pos, max_pos);
@@ -249,12 +255,13 @@ float controller_get_position_percentage()
     auto pos = position_sensor_is_power()
                    ? position_sensor_read_raw()
                    : position_sensor_read();
-    auto perc = pos > g_calibration_data.bottom_limit
+    auto posInRange = (float)pos - g_calibration_data.top_limit;
+    auto perc = pos >= g_calibration_data.bottom_limit
                     ? 100.0f
-                : pos < g_calibration_data.top_limit
+                : pos <= g_calibration_data.top_limit
                     ? 0.0f
-                    : (g_calibration_data.bottom_limit - g_calibration_data.top_limit) / (float)pos;
-    return 100.0f - perc;
+                    : 100.0f * posInRange / (g_calibration_data.bottom_limit - g_calibration_data.top_limit);
+    return perc;
 }
 
 void controller_stop(void)
@@ -423,10 +430,10 @@ void motor_control_status_changed(motor_status_t status)
             r = controller_state_t::IDLE;
             break;
         case motor_status_t::MOTOR_MOVING_FORWARD:
-            r = controller_state_t::MOVING_UP;
+            r = controller_state_t::MOVING_DOWN;
             break;
         case motor_status_t::MOTOR_MOVING_REVERSE:
-            r = controller_state_t::MOVING_DOWN;
+            r = controller_state_t::MOVING_UP;
             break;
         case motor_status_t::MOTOR_EMERGENCY_STOP:
             r = controller_state_t::EMERGENCY_STOP;

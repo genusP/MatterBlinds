@@ -17,7 +17,7 @@ extern "C"
     } matter_shade_state_t;
 
     void matter_integration_init(void);
-    void matter_integration_update_state(state_t state, float position);
+    void matter_integration_update_state(controller_state_t state, float position);
     void matter_integration_set_position_callback(void (*callback)(uint8_t position));
     void matter_integration_set_move_callback(void (*callback)(bool direction));
 

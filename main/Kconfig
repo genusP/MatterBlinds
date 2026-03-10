@@ -1,4 +1,4 @@
-# Конфигурация для проекта MatterBlinds
+menu "Rollershade Driver"
 
 menu "Конфигурация датчика положения"
 
@@ -65,6 +65,10 @@ config EXTERNAL_INTEGRATION
         1 - Интеграция через Matter
         2 - Интеграция через MQTT
 
+config POSITION_UPDATE_PERIOD_MS
+    int "Период обновления позиции"
+    default 5000
+
 config MQTT_BROKER_HOST
     string "MQTT брокер хост"
     default "192.168.1.100"
@@ -103,33 +107,12 @@ config MQTT_PASSWORD
         Пароль для аутентификации на MQTT брокере.
         Оставьте пустым если аутентификация не требуется.
 
-config MQTT_TOPIC_POSITION
-    string "MQTT топик позиции"
-    default "matterblinds/position"
+config MQTT_TOPIC
+    string "MQTT топик"
+    default "rollershade"
     depends on EXTERNAL_INTEGRATION = 2
     help
-        Топик для публикации текущей позиции штор.
-
-config MQTT_TOPIC_MOVEMENT
-    string "MQTT топик движения"
-    default "matterblinds/movement"
-    depends on EXTERNAL_INTEGRATION = 2
-    help
-        Топик для публикации статуса движения штор.
-
-config MQTT_TOPIC_COMMAND
-    string "MQTT топик команд"
-    default "matterblinds/command"
-    depends on EXTERNAL_INTEGRATION = 2
-    help
-        Топик для подписки на команды управления шторами.
-
-config MQTT_TOPIC_STATE
-    string "MQTT топик состояния"
-    default "matterblinds/state"
-    depends on EXTERNAL_INTEGRATION = 2
-    help
-        Топик для публикации состояния штор (open/closed/opening/closing).
+        Топик для взаимодействия.
 
 config MQTT_USE_SSL
     bool "Использовать SSL для MQTT"
@@ -194,6 +177,11 @@ config MOTOR_PIN_FWD
     help
         Номер GPIO пина для вращения вперед.
 
+config MOTOR_STALL_CONTROL
+    bool "Контролировать заклинивание мотора"
+    default y
+    help
+        Отключить при работе с симулятором
 
 endmenu
 
@@ -213,4 +201,5 @@ config BUTTON_DOWN_PIN
     help
         Номер GPIO пина для кнопки движения вниз.
 
+endmenu
 endmenu

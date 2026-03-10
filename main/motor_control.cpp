@@ -185,27 +185,27 @@ static void motor_control_task(void *pvParameters)
         {
             int cur_adc = position_sensor_read_raw();
             int diff = (int)state.target_pos - cur_adc;
-
+#if CONFIG_MOTOR_STALL_CONTROL
             // --- ЗАЩИТА ОТ ЗАКЛИНИВАНИЯ ---
-            // if (abs(cur_adc - last_adc) < STALL_THRESHOLD)
-            // {
-            //     stall_counter += ITERATION_DELAY; // Добавляем время цикла (10мс)
-            // }
-            // else
-            // {
-            //     stall_counter = 0; // Движение есть, сбрасываем счетчик
-            //     last_adc = cur_adc;
-            // }
+            if (abs(cur_adc - last_adc) < STALL_THRESHOLD)
+            {
+                stall_counter += ITERATION_DELAY; // Добавляем время цикла (10мс)
+            }
+            else
+            {
+                stall_counter = 0; // Движение есть, сбрасываем счетчик
+                last_adc = cur_adc;
+            }
 
-            // if (stall_counter >= STALL_TIMEOUT_MS)
-            // {
-            //     ESP_LOGE(TAG, "Motor STALL detected! Emergency stop.");
-            //     motor_stop();
-            //     stall_counter = 0;
-            //     update_status(MOTOR_EMERGENCY_STOP);
-            // }
+            if (stall_counter >= STALL_TIMEOUT_MS)
+            {
+                ESP_LOGE(TAG, "Motor STALL detected! Emergency stop.");
+                motor_stop();
+                stall_counter = 0;
+                update_status(MOTOR_EMERGENCY_STOP);
+            }
             // ------------------------------
-
+#endif
             // Логика остановки по достижению цели
             if (abs(diff) < THRESHOLD)
             {

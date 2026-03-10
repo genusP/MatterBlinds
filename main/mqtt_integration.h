@@ -17,9 +17,6 @@ extern "C"
     // Публикация состояния штор
     esp_err_t mqtt_integration_publish_position(uint8_t position);
 
-    // Публикация статуса движения
-    esp_err_t mqtt_integration_publish_movement(bool is_moving, bool direction_up);
-
     // Подписка на команды управления
     esp_err_t mqtt_integration_subscribe_commands(void);
 
