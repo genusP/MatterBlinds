@@ -1,357 +1,383 @@
+// main.controller.cpp
+
 #include "controller.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "sdkconfig.h"
 #include "motor_control.h"
+#include <iot_button.h>
+#include "calibration.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 
 static const char *TAG = "controller";
 
 // Кэш конфигурации
-static config_t g_config = {0};
+static controller_state_t g_state = IDLE;
+static calibration_data_t g_calibration_data = {.top_limit = 100, .bottom_limit = 4000};
 
-// Флаги состояния
-static bool g_button_held = false;
-static calibration_step_callback_t g_calibration_callback = NULL;
+// Система подписки на события изменения состояния
+static struct
+{
+    controller_state_changed_cb_t callbacks[CONTROLLER_MAX_SUBSCRIBERS];
+    void *user_data[CONTROLLER_MAX_SUBSCRIBERS];
+    uint8_t count;
+} g_state_subscribers = {0};
 
-// Задача для периодической проверки границ
-static TaskHandle_t g_boundary_check_task = NULL;
+// кнопки
+static button_handle_t g_button_up = NULL;
+static button_handle_t g_button_down = NULL;
 
 // Объявления функций
-static void controller_button_callback(button_event_t event, button_id_t button_id, void *user_data);
-static void controller_move_to_percentage(float percentage);
+static void controller_button_callback(void *button_handle, void *user_data);
+static void controller_button_press_up(void *arg, void *user_data);
+static void button_handler_init(void);
+static void motor_control_status_changed(motor_status_t status);
+#ifdef CONFIG_ZEBRA_BLINDS_SUPPORT
 static void controller_handle_zebra_offset(void);
-static bool controller_check_boundaries_and_stop(void);
+#endif
 
+const char *controller_state_text(controller_state_t state)
+{
+    switch (state)
+    {
+    case IDLE:
+        return "IDLE";
+    case MOVING_UP:
+        return "MOVING_UP";
+    case MOVING_DOWN:
+        return "MOVING_DOWN";
+    case EMERGENCY_STOP:
+        return "EMERGENCY_STOP";
+    case CALIBRATING_INIT:
+        return "CALIBRATING_INIT";
+    case CALIBRATING:
+        return "CALIBRATING";
+    default:
+        return "UNKNOWN";
+    }
+}
+
+bool is_calibrated() { return g_calibration_data.state == CALIBRATED; }
+bool is_calibrating() { return g_state == CALIBRATING || g_state == CALIBRATING_INIT; }
+
+void update_state(controller_state_t state)
+{
+    if (g_state != state)
+    {
+        controller_state_t old_state = g_state;
+        ESP_LOGD(TAG, "Change controller state: %s -> %s", controller_state_text(old_state), controller_state_text(state));
+        g_state = state;
+
+        // Уведомляем всех подписчиков об изменении состояния
+        for (uint8_t i = 0; i < g_state_subscribers.count; i++)
+        {
+            if (g_state_subscribers.callbacks[i] != NULL)
+            {
+                g_state_subscribers.callbacks[i](old_state, state, g_state_subscribers.user_data[i]);
+            }
+        }
+    }
+}
 void controller_init(void)
 {
     ESP_LOGI(TAG, "Initializing controller");
 
     // Инициализация подсистем
-    motor_control_init();
+    read_calibration_data(&g_calibration_data);
     position_sensor_init();
+    motor_init(g_calibration_data.bottom_limit, g_calibration_data.top_limit);
+    motor_control_set_status_callback(motor_control_status_changed);
     button_handler_init();
 
-    // Установка callback для кнопок
-    button_handler_set_callback(controller_button_callback, NULL);
-
-    // Установка начального состояния
-    g_config.state = IDLE;
-    g_config.auto_calibrate = !position_sensor_is_calibrated();
+    update_state(
+        is_calibrated()
+            ? controller_state_t::IDLE
+            // переводим в готовность к калибровке чтоб перейти при любом нажатии перейтив калибровку
+            : controller_state_t::CALIBRATING_INIT);
 
     ESP_LOGI(TAG, "Controller initialized. Calibrated: %s",
-             position_sensor_is_calibrated() ? "Yes" : "No");
+             is_calibrated() ? "Yes" : "No");
+}
+
+void button_handler_init(void)
+{
+    ESP_LOGI(TAG, "Initializing button handler");
+
+    // Инициализация кнопки вверх
+    button_config_t up_button_config = {
+        .type = BUTTON_TYPE_GPIO,
+        .short_press_time = 50,
+        .gpio_button_config = {
+            .gpio_num = CONFIG_BUTTON_UP_PIN,
+            .active_level = 0, // Активный низкий уровень (кнопка замыкает на GND)
+        },
+    };
+
+    g_button_up = iot_button_create(&up_button_config);
+    if (g_button_up == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create up button");
+        return;
+    }
+
+    // Инициализация кнопки вниз
+    button_config_t down_button_config = {
+        .type = BUTTON_TYPE_GPIO,
+        .short_press_time = 50,
+        .gpio_button_config = {
+            .gpio_num = CONFIG_BUTTON_DOWN_PIN,
+            .active_level = 0, // Активный низкий уровень
+        },
+    };
+
+    g_button_down = iot_button_create(&down_button_config);
+    if (g_button_down == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create down button");
+        return;
+    }
+
+    // Регистрация обработчиков для кнопки вверх
+    iot_button_register_cb(g_button_up, BUTTON_SINGLE_CLICK, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_up, BUTTON_DOUBLE_CLICK, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_up, BUTTON_LONG_PRESS_START, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_up, BUTTON_LONG_PRESS_UP, controller_button_press_up, NULL);
+
+    // Регистрация обработчиков для кнопки вниз
+    iot_button_register_cb(g_button_down, BUTTON_SINGLE_CLICK, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_down, BUTTON_DOUBLE_CLICK, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_down, BUTTON_LONG_PRESS_START, controller_button_callback, NULL);
+    iot_button_register_cb(g_button_down, BUTTON_LONG_PRESS_UP, controller_button_press_up, NULL);
+
+    ESP_LOGI(TAG, "Button handler initialized successfully");
+}
+
+bool is_moving_allowed()
+{
+    if (is_calibrating())
+    {
+        ESP_LOGW(TAG, "Cannot move during calibration");
+        return false;
+    }
+    if (!is_calibrated())
+    {
+        ESP_LOGW(TAG, "Not calinrated, cannot move.");
+        return false;
+    }
+    return true;
 }
 
 void controller_move_to_position(uint32_t position)
 {
-    if (g_config.state == CALIBRATING)
+    if (is_moving_allowed())
     {
-        ESP_LOGW(TAG, "Cannot move to position during calibration");
-        return;
+        ESP_LOGI(TAG, "Moving to position %lu", position);
+
+        motor_move_to_position(position);
     }
-
-    uint32_t current_pos = position_sensor_read();
-
-    if (current_pos == position)
-    {
-        ESP_LOGI(TAG, "Already at target position: %lu", position);
-        return;
-    }
-
-    ESP_LOGI(TAG, "Moving from position %lu to %lu", current_pos, position);
-
-    // Определяем направление на основе текущей и целевой позиций
-    motor_direction_t direction = (position > current_pos
-                                   ? MOTOR_DIR_DOWN;
-                                   : MOTOR_DIR_UP);
-
-    // Устанавливаем направление мотора
-    motor_set_direction(direction);
-
-    // Вычисляем количество шагов (упрощенный подход)
-    uint32_t position_diff = (position > current_pos) ? (position - current_pos) : (current_pos - position);
-
-    // Устанавливаем скорость по умолчанию
-    uint32_t speed = CONFIG_MOTOR_DEFAULT_SPEED;
-    motor_set_speed(speed);
-
-    // Запускаем движение мотора
-    motor_step(position_diff);
-
-    // Обновляем состояние
-    if (direction == MOTOR_DIR_UP)
-    {
-        g_config.state = MOVING_UP;
-    }
-    else
-    {
-        g_config.state = MOVING_DOWN;
-    }
-
-    g_config.position.current_position = position;
-
-    // Проверяем границы сразу после запуска движения
-    controller_check_boundaries_and_stop();
 }
 
 void controller_move_up(void)
 {
-    if (g_config.state == CALIBRATING)
+    if (is_moving_allowed())
     {
-        ESP_LOGW(TAG, "Cannot move up during calibration");
-        return;
+        ESP_LOGI(TAG, "Moving up");
+        motor_start_forward();
     }
-
-    ESP_LOGI(TAG, "Moving up");
-    motor_set_direction(MOTOR_DIR_UP);
-
-    // Устанавливаем скорость
-    uint32_t speed = CONFIG_MOTOR_DEFAULT_SPEED;
-    motor_set_speed(speed);
-
-    // Движение вверх - можно использовать большое количество шагов для непрерывного движения
-    motor_step(UINT32_MAX);
-
-    g_config.state = MOVING_UP;
 }
 
 void controller_move_down(void)
 {
-    if (g_config.state == CALIBRATING)
+    if (is_moving_allowed())
     {
-        ESP_LOGW(TAG, "Cannot move down during calibration");
-        return;
-    }
-
-    ESP_LOGI(TAG, "Moving down");
-    motor_set_direction(MOTOR_DIR_DOWN);
-
-    // Устанавливаем скорость
-    uint32_t speed = CONFIG_MOTOR_DEFAULT_SPEED;
-    motor_set_speed(speed);
-
-    // Движение вниз - можно использовать большое количество шагов для непрерывного движения
-    motor_step(UINT32_MAX);
-
-    g_config.state = MOVING_DOWN;
-}
-
-void controller_stop(void)
-{
-    ESP_LOGI(TAG, "Stopping motor");
-
-    // Проверяем, движется ли мотор
-    if (motor_is_moving())
-    {
-        ESP_LOGI(TAG, "Motor is moving, stopping");
-        motor_stop();
-    }
-    else
-    {
-        ESP_LOGD(TAG, "Motor already stopped");
-    }
-
-    g_config.state = IDLE;
-    g_button_held = false;
-}
-
-void controller_calibrate(void)
-{
-    ESP_LOGI(TAG, "Starting calibration mode");
-    g_config.state = CALIBRATING;
-    controller_stop();
-
-    // Получаем callback для описания шагов калибровки
-    g_calibration_callback = position_sensor_start_calibration();
-
-    if (g_calibration_callback)
-    {
-        calibration_step_t current_step = position_sensor_next_calibration_step();
-        const char *description = g_calibration_callback(current_step);
-        ESP_LOGI(TAG, "Calibration step %d: %s", current_step, description);
+        ESP_LOGI(TAG, "Moving down");
+        motor_start_reverce();
     }
 }
 
 void controller_goto_top(void)
 {
-    if (position_sensor_is_calibrated())
+    if (is_moving_allowed())
     {
         // Получаем реальную минимальную позицию из position_sensor
-        uint32_t min_pos = position_sensor_get_min_position();
-        ESP_LOGI(TAG, "Moving to top position: %lu", min_pos);
+        uint32_t min_pos = g_calibration_data.top_limit;
         controller_move_to_position(min_pos);
-    }
-    else
-    {
-        ESP_LOGW(TAG, "Not calibrated, cannot goto top");
     }
 }
 
 void controller_goto_bottom(void)
 {
-    if (position_sensor_is_calibrated())
+    if (is_moving_allowed())
     {
         // Получаем реальную максимальную позицию из position_sensor
-        uint32_t max_pos = position_sensor_get_max_position();
-        ESP_LOGI(TAG, "Moving to bottom position: %lu", max_pos);
+        uint32_t max_pos = g_calibration_data.bottom_limit;
         controller_move_to_position(max_pos);
     }
-    else
-    {
-        ESP_LOGW(TAG, "Not calibrated, cannot goto bottom");
-    }
 }
 
-state_t controller_get_state(void)
+controller_state_t controller_get_state(void)
 {
-    return g_config.state;
-}
-
-bool controller_is_moving(void)
-{
-    return motor_is_moving();
+    return g_state;
 }
 
 void controller_set_position_percentage(float percentage)
 {
-    if (percentage < 0.0f)
-        percentage = 0.0f;
-    if (percentage > 100.0f)
-        percentage = 100.0f;
-
-    if (position_sensor_is_calibrated())
+    if (is_moving_allowed())
     {
-        uint32_t current_pos = position_sensor_read();
-        float current_percentage = position_sensor_get_percentage();
+        if (percentage < 0.0f)
+            percentage = 0.0f;
+        if (percentage > 100.0f)
+            percentage = 100.0f;
 
         // Получаем реальные границы из position_sensor
-        uint32_t min_pos = position_sensor_get_min_position();
-        uint32_t max_pos = position_sensor_get_max_position();
+        uint32_t min_pos = g_calibration_data.top_limit;
+        uint32_t max_pos = g_calibration_data.bottom_limit;
         uint32_t range = max_pos - min_pos;
-        uint32_t target_position = min_pos + (uint32_t)(range * percentage / 100.0f);
+        uint32_t target_position = min_pos + (uint32_t)(range * (100.0f - percentage) / 100.0f);
 
         ESP_LOGI(TAG, "Setting position %.1f%% (ADC: %lu, range: %lu-%lu)",
                  percentage, target_position, min_pos, max_pos);
 
         controller_move_to_position(target_position);
     }
-    else
+}
+
+float controller_get_position_percentage()
+{
+    auto pos = position_sensor_is_power()
+                   ? position_sensor_read_raw()
+                   : position_sensor_read();
+    auto perc = pos > g_calibration_data.bottom_limit
+                    ? 100.0f
+                : pos < g_calibration_data.top_limit
+                    ? 0.0f
+                    : (g_calibration_data.bottom_limit - g_calibration_data.top_limit) / (float)pos;
+    return 100.0f - perc;
+}
+
+void controller_stop(void)
+{
+    motor_stop();
+}
+
+void controller_calibrate(void)
+{
+    g_calibration_data = calibration_start();
+}
+
+static void controller_button_press_up(void *arg, void *user_data)
+{
+    if (g_state == MOVING_UP || g_state == MOVING_DOWN)
     {
-        ESP_LOGW(TAG, "Not calibrated, cannot set position percentage");
+        motor_stop();
+    }
+    else if (g_state == CALIBRATING_INIT)
+    {
+        button_handle_t btn_handle = (button_handle_t)arg;
+        auto other_btn = btn_handle == g_button_up ? g_button_down : g_button_up;
+        if (iot_button_get_key_level(other_btn) == 0)
+        {
+            controller_calibrate();
+        }
     }
 }
 
-static void controller_button_callback(button_event_t event, button_id_t button_id, void *user_data)
+static void controller_button_handler_on_calibrating(button_handle_t btn_handle, button_event_t event)
 {
-    ESP_LOGI(TAG, "Button event: %d, button_id: %d", event, button_id);
+    switch (event)
+    {
+    case BUTTON_SINGLE_CLICK:
+        g_calibration_data = calibration_next();
+        if (g_calibration_data.state == CALIBRATED)
+        {
+            save_calibration_data(g_calibration_data);
+            esp_restart();
+        }
+        break;
+    case BUTTON_LONG_PRESS_START:
+        // нажаты обе кнопки
+        if (iot_button_get_key_level(g_button_down) == 1 && iot_button_get_key_level(g_button_up) == 1)
+        {
+            calibration_cancel();
+            esp_restart();
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static void controller_button_callback(void *arg, void *user_data)
+{
+    button_handle_t btn_handle = (button_handle_t)arg;
+    button_event_t event = iot_button_get_event(btn_handle);
+
+    ESP_LOGD(TAG, "Button event: %s, button_id: %s, state: %d", iot_button_get_event_str(event), btn_handle == g_button_up ? "UP" : "DOWN", g_state);
+
+    if (is_calibrating())
+    {
+        return controller_button_handler_on_calibrating(btn_handle, event);
+    }
+    else if (g_state != IDLE)
+    {
+        ESP_LOGD(TAG, "Current state: %s. Button event skip.", controller_state_text(g_state));
+    }
 
     switch (event)
     {
-    case BUTTON_EVENT_SIMULTANEOUS_PRESS:
-        if (g_config.state == CALIBRATING)
-        {
-            // Выход из режима калибровки
-            ESP_LOGI(TAG, "Exiting calibration mode");
-            g_config.state = IDLE;
-            g_calibration_callback = NULL;
-            controller_stop();
-        }
-        else
-        {
-            // Вход в режим калибровки
-            controller_calibrate();
-        }
-        break;
-
     case BUTTON_SINGLE_CLICK:
-        if (g_config.state == CALIBRATING && g_calibration_callback)
+        // Одиночное нажатие - переход в крайнее положение
+        if (btn_handle == g_button_up)
         {
-            // Сохраняем текущую позицию для шага калибровки
-            uint32_t current_position = position_sensor_read();
-            position_sensor_save_calibration_step(current_position);
-
-            // Переходим к следующему шагу
-            calibration_step_t next_step = position_sensor_next_calibration_step();
-
-            if (next_step == CALIBRATION_STEP_COMPLETE)
-            {
-                // Калибровка завершена
-                ESP_LOGI(TAG, "Calibration completed");
-                g_config.state = IDLE;
-                g_calibration_callback = NULL;
-                controller_stop();
-            }
-            else
-            {
-                // Показываем описание следующего шага
-                const char *description = g_calibration_callback(next_step);
-                ESP_LOGI(TAG, "Calibration step %d: %s", next_step, description);
-            }
+            controller_goto_top();
         }
-        else
+        else if (btn_handle == g_button_down)
         {
-            // Одиночное нажатие - переход в крайнее положение
-            if (button_id == BUTTON_ID_UP)
-            {
-                controller_goto_top();
-            }
-            else if (button_id == BUTTON_ID_DOWN)
-            {
-                controller_goto_bottom();
-            }
+            controller_goto_bottom();
         }
         break;
 
     case BUTTON_DOUBLE_CLICK:
-        if (g_config.state != CALIBRATING)
-        {
-            // Двойное нажатие
+        // Двойное нажатие
 #ifdef CONFIG_ZEBRA_BLINDS_SUPPORT
-            if (position_sensor_is_calibrated())
+        if (position_sensor_is_calibrated())
+        {
+            uint32_t zebra_offset = position_sensor_get_zebra_offset();
+            if (zebra_offset > 0)
             {
-                uint32_t zebra_offset = position_sensor_get_zebra_offset();
-                if (zebra_offset > 0)
-                {
-                    // Выполнение откалиброванного смещения для штор зебра
-                    controller_handle_zebra_offset();
-                    break;
-                }
+                // Выполнение откалиброванного смещения для штор зебра
+                controller_handle_zebra_offset(btn_handle);
+                break;
             }
-#else
-            // Переход на позицию 50%
-            controller_set_position_percentage(50.0f);
-#endif
         }
+#else
+        // Переход на позицию 50%
+        controller_set_position_percentage(50.0f);
+#endif
+
         break;
 
     case BUTTON_LONG_PRESS_START:
-        if (g_config.state != CALIBRATING)
+        // нажаты обе кнопки
+        if (iot_button_get_key_level(g_button_down) == 1 && iot_button_get_key_level(g_button_up) == 1)
+        {
+            // подтверждаем старт калибровки и ждем отпускания кнопок
+            update_state(CALIBRATING_INIT);
+            break;
+        }
+        else
         {
             // Движение пока кнопка удерживается
-            g_button_held = true;
-            if (button_id == BUTTON_ID_UP)
+            if (btn_handle == g_button_up)
             {
                 controller_move_up();
             }
-            else if (button_id == BUTTON_ID_DOWN)
+            else if (btn_handle == g_button_down)
             {
                 controller_move_down();
             }
-
-            // Запускаем задачу проверки границ
-            if (g_boundary_check_task == NULL)
-            {
-                xTaskCreate(boundary_check_task, "boundary_check", 2048, NULL, 10, &g_boundary_check_task);
-            }
-        }
-        break;
-
-    case BUTTON_PRESS_UP:
-        if (g_button_held)
-        {
-            // Остановка движения при отпускании кнопки
-            controller_stop();
         }
         break;
 
@@ -361,107 +387,89 @@ static void controller_button_callback(button_event_t event, button_id_t button_
 }
 
 #ifdef CONFIG_ZEBRA_BLINDS_SUPPORT
-static void controller_handle_zebra_offset(void)
+static void controller_handle_zebra_offset(button_handle_t btn_handle)
 {
-    if (!position_sensor_is_calibrated())
+    if (is_moving_allowed())
     {
-        ESP_LOGW(TAG, "Not calibrated, cannot handle zebra offset");
-        return;
-    }
 
-    uint32_t zebra_offset = position_sensor_get_zebra_offset();
-    if (zebra_offset == 0)
-    {
-        ESP_LOGW(TAG, "Zebra offset not configured");
-        return;
-    }
+        auto offset = btn_handle == g_button_down
+                          ? (int32_t)g_calibration_data.zebra_offset
+                          : -(int32_t)g_calibration_data.zebra_offset;
+        // Вычисляем целевую позицию с учетом смещения
+        uint32_t current_pos = position_sensor_read();
+        int32_t target_pos = (int32_t)current_pos + offset;
 
-    // Вычисляем целевую позицию с учетом смещения
-    uint32_t current_pos = position_sensor_read();
-    uint32_t target_pos;
+        // получам целевую позицию с учетом границ
+        target_pos = target_pos < g_calibration_data.top_limit
+                         ? g_calibration_data.top_limit
+                     : target_pos > g_calibration_data.bottom_limit
+                         ? g_calibration_data.bottom_limit
+                         : target_pos;
 
-    // Получаем границы из position_sensor (нужно будет добавить функции)
-    uint32_t min_pos = 0;    // position_sensor_get_min_position();
-    uint32_t max_pos = 4095; // position_sensor_get_max_position();
-
-    // Определяем direction на основе текущей позиции
-    if (current_pos <= min_pos + zebra_offset)
-    {
-        // Двигаемся вниз на смещение
-        target_pos = current_pos + zebra_offset;
+        ESP_LOGI(TAG, "Moving to zebra offset position: %li", target_pos);
+        controller_move_to_position((uint32_t)target_pos);
     }
-    else if (current_pos >= max_pos - zebra_offset)
-    {
-        // Двигаемся вверх на смещение
-        target_pos = current_pos - zebra_offset;
-    }
-    else
-    {
-        // Чередуем направление движения
-        static bool last_direction_up = false;
-        if (last_direction_up)
-        {
-            target_pos = current_pos - zebra_offset;
-        }
-        else
-        {
-            target_pos = current_pos + zebra_offset;
-        }
-        last_direction_up = !last_direction_up;
-    }
-
-    // Ограничиваем целевую позицию в пределах диапазона
-    if (target_pos < min_pos)
-    {
-        target_pos = min_pos;
-    }
-    else if (target_pos > max_pos)
-    {
-        target_pos = max_pos;
-    }
-
-    ESP_LOGI(TAG, "Moving to zebra offset position: %lu", target_pos);
-    controller_move_to_position(target_pos);
 }
 #endif
 
-// Функция проверки границ и автоматической остановки
-static bool controller_check_boundaries_and_stop(void)
+void motor_control_status_changed(motor_status_t status)
 {
-    if (!position_sensor_is_calibrated())
+    if (g_state < CALIBRATING_INIT)
     {
-        return false; // Нет калибровки - не проверяем границы
+        controller_state_t r = IDLE;
+        switch (status)
+        {
+        case motor_status_t::MOTOR_IDLE:
+            r = controller_state_t::IDLE;
+            break;
+        case motor_status_t::MOTOR_MOVING_FORWARD:
+            r = controller_state_t::MOVING_UP;
+            break;
+        case motor_status_t::MOTOR_MOVING_REVERSE:
+            r = controller_state_t::MOVING_DOWN;
+            break;
+        case motor_status_t::MOTOR_EMERGENCY_STOP:
+            r = controller_state_t::EMERGENCY_STOP;
+            break;
+
+        default:
+            ESP_LOGW(TAG, "Motor status %d not mapped. (motor_control_status_changed)", status);
+            return;
+        }
+        update_state(r);
     }
-
-    uint32_t current_pos = position_sensor_read();
-    uint32_t min_pos = position_sensor_get_min_position();
-    uint32_t max_pos = position_sensor_get_max_position();
-
-    // Проверяем достижение границы
-    if (current_pos <= min_pos || current_pos >= max_pos)
-    {
-        ESP_LOGI(TAG, "%s boundary reached: %lu", current_pos >= max_pos ? "Lower" : "current_pos >= max_pos", current_pos);
-        controller_stop();
-        return true;
-    }
-
-    return false;
 }
 
-// Периодическая задача для проверки границ при удержании кнопки
-static void boundary_check_task(void *parameter)
+bool controller_subscribe_state_changes(controller_state_changed_cb_t callback, void *user_data)
 {
-    while (g_button_held && motor_is_moving())
+    if (callback == NULL)
     {
-        // Проверяем границы каждые 100 мс
-        if (controller_check_boundaries_and_stop())
-        {
-            break; // Вышли из цикла, так как достигли границы
-        }
-        vTaskDelay(pdMS_TO_TICKS(100));
+        ESP_LOGE(TAG, "Callback function cannot be NULL");
+        return false;
     }
 
-    // Задача завершается, когда кнопка отпущена или мотор остановлен
-    g_boundary_check_task = NULL;
-    vTaskDelete(NULL);
+    if (g_state_subscribers.count >= CONTROLLER_MAX_SUBSCRIBERS)
+    {
+        ESP_LOGE(TAG, "Maximum number of subscribers reached (%d)", CONTROLLER_MAX_SUBSCRIBERS);
+        return false;
+    }
+
+    // Проверяем, что такой callback уже не зарегистрирован
+    for (uint8_t i = 0; i < g_state_subscribers.count; i++)
+    {
+        if (g_state_subscribers.callbacks[i] == callback)
+        {
+            ESP_LOGW(TAG, "Callback already registered");
+            return false;
+        }
+    }
+
+    // Добавляем нового подписчика
+    g_state_subscribers.callbacks[g_state_subscribers.count] = callback;
+    g_state_subscribers.user_data[g_state_subscribers.count] = user_data;
+    g_state_subscribers.count++;
+
+    ESP_LOGD(TAG, "State change subscriber added. Total subscribers: %d", g_state_subscribers.count);
+
+    return true;
 }

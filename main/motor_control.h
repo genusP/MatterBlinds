@@ -11,22 +11,21 @@ extern "C"
 
     typedef enum
     {
-        MOTOR_DIR_UP,
-        MOTOR_DIR_DOWN,
-        MOTOR_DIR_STOP
-    } motor_direction_t;
+        MOTOR_IDLE = 0,
+        MOTOR_MOVING_FORWARD, // Направление к max_pos
+        MOTOR_MOVING_REVERSE, // Направление к min_pos
+        MOTOR_EMERGENCY_STOP
+    } motor_status_t;
 
-    void motor_control_init(void);
-    void motor_set_direction(motor_direction_t direction);
-    void motor_set_speed(uint32_t speed);
-    void motor_step(uint32_t steps);
-    bool motor_is_moving(void);
-    void motor_stop(void);
+    typedef void (*motor_status_changed_cb_t)(motor_status_t new_status);
 
-    void motor_set_step_mode(bool half_step);
-    uint32_t motor_get_position_steps(void);
-    void motor_move_degrees(float degrees);
-    void motor_move_rotations(float rotations);
+    void motor_init(uint32_t max_pos, uint32_t min_pos);
+    void motor_control_set_status_callback(motor_status_changed_cb_t cb);
+    void motor_move_to_position(uint32_t pos);
+    motor_status_t motor_get_status(void);
+    void motor_start_forward();
+    void motor_start_reverce();
+    void motor_stop();
 
 #ifdef __cplusplus
 }
