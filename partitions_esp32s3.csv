@@ -1,0 +1,8 @@
+# Name,   Type, SubType, Offset, Size, Flags
+nvs,      data, nvs,     ,        0x10000,
+otadata,  data, ota,     ,        0x2000,
+phy_init, data, phy,     ,        0x1000,
+# Раздел для хранения настроек Matter (обязательно!)
+fctry,    data, nvs,     ,        0x6000,
+# Основной раздел приложения (увеличиваем до 3 МБ для ESP32-S3)
+factory,  app,  factory, ,        0x300000,

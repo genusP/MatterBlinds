@@ -55,15 +55,17 @@ endmenu
 
 menu "Конфигурация внешней интеграции"
 
-config EXTERNAL_INTEGRATION
-    int "Тип внешней интеграции"
-    range 0 2
-    default 0
-    help
-        Выберите тип внешней интеграции:
-        0 - Без интеграции
-        1 - Интеграция через Matter
-        2 - Интеграция через MQTT
+choice 
+    prompt "Тип внешней инттеграции"
+    default EXTERNAL_INTEGRATION_NONE
+
+    config EXTERNAL_INTEGRATION_NONE
+        bool "Без интеграции"
+    config EXTERNAL_INTEGRATION_MQTT
+        bool "MQTT"
+    config EXTERNAL_INTEGRATION_MATTER
+        bool "Matter"
+endchoice
 
 config POSITION_UPDATE_PERIOD_MS
     int "Период обновления позиции"
@@ -72,7 +74,7 @@ config POSITION_UPDATE_PERIOD_MS
 config MQTT_BROKER_HOST
     string "MQTT брокер хост"
     default "192.168.1.100"
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         IP адрес или доменное имя MQTT брокера.
 
@@ -80,21 +82,21 @@ config MQTT_BROKER_PORT
     int "MQTT брокер порт"
     range 1 65535
     default 1883
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Порт MQTT брокера (обычно 1883 для незащищенного, 8883 для SSL).
 
 config MQTT_CLIENT_ID
     string "MQTT клиент ID"
     default "Rollershade Driver"
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Уникальный идентификатор клиента для MQTT брокера.
 
 config MQTT_USERNAME
     string "MQTT имя пользователя"
     default ""
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Имя пользователя для аутентификации на MQTT брокере.
         Оставьте пустым если аутентификация не требуется.
@@ -102,7 +104,7 @@ config MQTT_USERNAME
 config MQTT_PASSWORD
     string "MQTT пароль"
     default ""
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Пароль для аутентификации на MQTT брокере.
         Оставьте пустым если аутентификация не требуется.
@@ -110,21 +112,21 @@ config MQTT_PASSWORD
 config MQTT_TOPIC
     string "MQTT топик"
     default "rollershade"
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Топик для взаимодействия.
 
 config MQTT_USE_SSL
     bool "Использовать SSL для MQTT"
     default n
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Включить защищенное соединение с MQTT брокером через SSL/TLS.
 
 config MQTT_HA_DISCOVERY_ENABLED
     bool "Включить Home Assistant MQTT Discovery"
     default y
-    depends on EXTERNAL_INTEGRATION = 2
+    depends on EXTERNAL_INTEGRATION_MQTT
     help
         Автоматически публиковать конфигурацию для автообнаружения в Home Assistant.
         Устройство будет автоматически добавлено в Home Assistant какcover (шторы).

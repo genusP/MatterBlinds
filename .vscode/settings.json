@@ -9,5 +9,7 @@
   },
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
-  ]
+  ],
+  "idf.port": "/dev/ttyACM0",
+  "idf.flashType": "UART"
 }

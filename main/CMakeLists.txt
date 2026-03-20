@@ -1,24 +1,16 @@
 set(COMMON_SRCS
-    "main.cpp"
-    "position_sensor.cpp"
-    "motor_control.cpp"
-    "calibration.cpp"
-    "controller.cpp"
+    "main.c"
 )
 
-#Базовые зависимости
-set(COMMON_REQUIRES
-    button
-)
 
 # Условные зависимости
-if(CONFIG_EXTERNAL_INTEGRATION EQUAL 1)
-    list(APPEND COMMON_SRCS "matter_intagration.cpp")
+if (CONFIG_EXTERNAL_INTEGRATION_MATTER)
+    list(APPEND COMMON_SRCS "main.cpp" "wifi.cpp" "matter_integration.cpp")
     list(APPEND COMMON_REQUIRES rsd_matter)
 endif()
 
-if(CONFIG_EXTERNAL_INTEGRATION EQUAL 2)
-    list(APPEND COMMON_SRCS "mqtt_integration.cpp")
+if (CONFIG_EXTERNAL_INTEGRATION_MQTT)
+    list(APPEND COMMON_SRCS "wifi.cpp" "mqtt_integration.cpp")
     list(APPEND COMMON_REQUIRES rsd_mqtt)
 endif()
 
