@@ -1,0 +1,2 @@
+#важно чтоб при включении этого файла в platformio.ini передавать в аргументы CMake значение RSD_INTEGRATION="mqtt"
+CONFIG_EXTERNAL_INTEGRATION_MQTT=y

@@ -1,10 +1,8 @@
-// components/shade_controller/shade_controller.h
+// components/Core/controller.h
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "position_sensor.h"
-#include "motor_control.h"
 
 // Maximum number of simultaneous subscribers
 #define CONTROLLER_MAX_SUBSCRIBERS 5

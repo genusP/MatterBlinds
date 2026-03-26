@@ -10,6 +10,13 @@
 #include "wifi.h"
 #include "nvs_flash.h"
 
+#ifndef WIFI_SSID
+#define WIFI_SSID "Wokwi-GUEST"
+#endif
+#ifndef WIFI_PASS
+#define WIFI_PASS ""
+#endif
+
 static EventGroupHandle_t s_wifi_event_group = xEventGroupCreate();
 static const int WIFI_STARTED_BIT = BIT0;
 static const int WIFI_CONNECTED_BIT = BIT1;
@@ -148,7 +155,7 @@ esp_err_t wifi_scan_and_get_network_params(wifi_ap_record_t *target_ap)
                  ap_records[i].primary, ap_records[i].authmode);
 
         // Проверяем, это ли наша целевая сеть
-        if (strcmp((char *)ap_records[i].ssid, CONFIG_DEFAULT_WIFI_SSID) == 0)
+        if (strcmp((char *)ap_records[i].ssid, WIFI_SSID) == 0)
         {
             target_found = true;
             ESP_LOGI(TAG, "=== TARGET NETWORK FOUND ===");
@@ -177,7 +184,7 @@ esp_err_t wifi_scan_and_get_network_params(wifi_ap_record_t *target_ap)
 
     if (!target_found)
     {
-        ESP_LOGW(TAG, "Target network '%s' not found in scan results", CONFIG_DEFAULT_WIFI_SSID);
+        ESP_LOGW(TAG, "Target network '%s' not found in scan results", WIFI_SSID);
     }
 
     free(ap_records);
@@ -188,30 +195,30 @@ esp_err_t wifi_scan_and_get_network_params(wifi_ap_record_t *target_ap)
 
 esp_err_t wifi_init(void)
 {
-    if (CONFIG_DEFAULT_WIFI_SSID[0] != '\0')
+    if (WIFI_SSID[0] != '\0')
     {
-        ESP_LOGI(TAG, "Initializing WiFi for SSID: %s", CONFIG_DEFAULT_WIFI_SSID);
+        ESP_LOGI(TAG, "Initializing WiFi for SSID: %s", WIFI_SSID);
 
-        // Очищаем NVS от старых WiFi параметров для избежания конфликтов
-        esp_err_t nvs_err = nvs_flash_erase_partition("nvs");
-        if (nvs_err == ESP_OK)
-        {
-            ESP_LOGI(TAG, "Cleared NVS partition to avoid old WiFi parameter conflicts");
-            // Переинициализируем NVS после очистки
-            nvs_err = nvs_flash_init();
-            if (nvs_err == ESP_OK)
-            {
-                ESP_LOGI(TAG, "NVS reinitialized successfully");
-            }
-            else
-            {
-                ESP_LOGE(TAG, "Failed to reinitialize NVS after erase: %s", esp_err_to_name(nvs_err));
-            }
-        }
-        else
-        {
-            ESP_LOGW(TAG, "Failed to erase NVS partition: %s", esp_err_to_name(nvs_err));
-        }
+        // // Очищаем NVS от старых WiFi параметров для избежания конфликтов
+        // esp_err_t nvs_err = nvs_flash_erase_partition("nvs");
+        // if (nvs_err == ESP_OK)
+        // {
+        //     ESP_LOGI(TAG, "Cleared NVS partition to avoid old WiFi parameter conflicts");
+        //     // Переинициализируем NVS после очистки
+        //     nvs_err = nvs_flash_init();
+        //     if (nvs_err == ESP_OK)
+        //     {
+        //         ESP_LOGI(TAG, "NVS reinitialized successfully");
+        //     }
+        //     else
+        //     {
+        //         ESP_LOGE(TAG, "Failed to reinitialize NVS after erase: %s", esp_err_to_name(nvs_err));
+        //     }
+        // }
+        // else
+        // {
+        //     ESP_LOGW(TAG, "Failed to erase NVS partition: %s", esp_err_to_name(nvs_err));
+        // }
 
         // Создаем WiFi station interface
         esp_netif_t *wifi_netif = esp_netif_create_default_wifi_sta();
@@ -247,14 +254,10 @@ esp_err_t wifi_init(void)
 
         wifi_config_t wifi_config = {
             .sta = {
-                .ssid = CONFIG_DEFAULT_WIFI_SSID,
-                .password = CONFIG_DEFAULT_WIFI_PASSWORDs,
+                .ssid = WIFI_SSID,
+                .password = WIFI_PASS,
                 /* Искать на всех каналах (важно для AX-роутеров и скрытых сетей) */
                 .scan_method = WIFI_ALL_CHANNEL_SCAN,
-                /* Настройки сканирования */
-                // .scan_config = {
-                //     .show_hidden = true, // Увидит скрытую сеть
-                // },
                 /* Позволяем роутеру самому диктовать правила безопасности */
                 .threshold = {
                     .authmode = WIFI_AUTH_OPEN, // Минимальный порог (подключится к любой)
@@ -266,8 +269,8 @@ esp_err_t wifi_init(void)
             },
         };
 
-        ESP_LOGI(TAG, "WiFi configuration prepared for SSID: %s", CONFIG_DEFAULT_WIFI_SSID);
-        ESP_LOGI(TAG, "Password length: %u, Auth mode: %d", strlen(CONFIG_DEFAULT_WIFI_PASSWORD), wifi_config.sta.threshold.authmode);
+        ESP_LOGI(TAG, "WiFi configuration prepared for SSID: %s", WIFI_SSID);
+        ESP_LOGI(TAG, "Password length: %u, Auth mode: %d", strlen(WIFI_PASS), wifi_config.sta.threshold.authmode);
 
         // Устанавливаем режим WiFi station
         err = esp_wifi_set_mode(WIFI_MODE_STA);
@@ -310,7 +313,7 @@ esp_err_t wifi_init(void)
             return ESP_ERR_TIMEOUT;
         }
 
-        ESP_LOGI(TAG, "WiFi station started, scanning networks before connection...");
+        // ESP_LOGI(TAG, "WiFi station started, scanning networks before connection...");
 
         // Сканируем сети для получения параметров целевой сети
         // wifi_ap_record_t target_ap;

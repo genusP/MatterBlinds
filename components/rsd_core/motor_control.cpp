@@ -1,10 +1,10 @@
+#include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <driver/ledc.h>
 #include <driver/gpio.h>
 #include "motor_control.h"
 #include "position_sensor.h"
-#include "sdkconfig.h"
 
 #define SPEED_MAX 8191 // 13-bit PWM
 #define THRESHOLD 50   // Погрешность АЦП
@@ -18,9 +18,9 @@ typedef struct
     uint32_t min_pos = 0;
     int32_t speed = 0;
     motor_status_t status = MOTOR_IDLE;
-} controller_state_t;
+} motor_state_t;
 
-volatile static controller_state_t state = {};
+volatile static motor_state_t state = {};
 static TaskHandle_t motor_task_handle = NULL;
 static motor_status_changed_cb_t status_cb = NULL;
 

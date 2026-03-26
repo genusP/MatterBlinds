@@ -56,7 +56,10 @@ endmenu
 menu "Конфигурация внешней интеграции"
 
 choice 
-    prompt "Тип внешней инттеграции"
+    prompt "Тип внешней инттеграции (для смены выберите окржение pio)"
+    default EXTERNAL_INTEGRATION_MQTT
+    default EXTERNAL_INTEGRATION_MATTER
+    default EXTERNAL_INTEGRATION_ZB
     default EXTERNAL_INTEGRATION_NONE
 
     config EXTERNAL_INTEGRATION_NONE
@@ -65,6 +68,8 @@ choice
         bool "MQTT"
     config EXTERNAL_INTEGRATION_MATTER
         bool "Matter"
+    config EXTERNAL_INTEGRATION_ZB
+        bool "ZigBee"
 endchoice
 
 config POSITION_UPDATE_PERIOD_MS

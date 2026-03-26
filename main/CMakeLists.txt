@@ -1,19 +1,11 @@
-set(COMMON_SRCS
-    "main.c"
+set(RSD_SRC "main.cpp")
+
+if(RSD_USE_WIFI)
+    list(APPEND RSD_SRC "wifi.cpp")
+endif()
+
+idf_component_register(
+    SRCS ${RSD_SRC}
+    INCLUDE_DIRS "."
+    REQUIRES rsd_core rsd_mqtt rsd_matter
 )
-
-
-# Условные зависимости
-if (CONFIG_EXTERNAL_INTEGRATION_MATTER)
-    list(APPEND COMMON_SRCS "main.cpp" "wifi.cpp" "matter_integration.cpp")
-    list(APPEND COMMON_REQUIRES rsd_matter)
-endif()
-
-if (CONFIG_EXTERNAL_INTEGRATION_MQTT)
-    list(APPEND COMMON_SRCS "wifi.cpp" "mqtt_integration.cpp")
-    list(APPEND COMMON_REQUIRES rsd_mqtt)
-endif()
-
-idf_component_register(SRCS ${COMMON_SRCS}
-                    INCLUDE_DIRS "."
-                    PRIV_REQUIRES ${COMMON_REQUIRES})

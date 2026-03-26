@@ -1,23 +1,31 @@
 {
-	"name": "ESP-IDF QEMU",
+	"name": "ESP-PIO",
 	"build": {
 		"dockerfile": "Dockerfile"
 	},
 	"customizations": {
 		"vscode": {
 			"settings": {
-				"terminal.integrated.defaultProfile.linux": "bash",
-				"idf.espIdfPath": "/opt/esp/idf",
-				"idf.toolsPath": "/opt/esp",
-				"idf.gitPath": "/usr/bin/git"
+				"platformio-ide.useBuiltinPIOCore": false,
+				"platformio-ide.customPATH": "/usr/local/bin/platformio"
 			},
 			"extensions": [
-				"espressif.esp-idf-extension@1.11.1",
-				"Wokwi.wokwi-vscode",
-				"ms-vscode.cpptools"
+				"pioarduino.pioarduino-ide",
+				"ms-vscode.cpptools",
+				"Wokwi.wokwi-vscode"
 			]
 		}
 	},
+	"remoteEnv": {
+		"PLATFORMIO_CORE_DIR": "/opt/pio",
+		"PIP_INDEX_URL": "https://pypi.tuna.tsinghua.edu.cn/simple",
+		"PIP_TRUSTED_HOST": "pypi.tuna.tsinghua.edu.cn",
+		"UV_INDEX_URL": "https://pypi.tuna.tsinghua.edu.cn/simple",
+		"LANG": "C.UTF-8"
+	},
+	"mounts": [
+		"source=pio_global_cache,target=/opt/pio"
+	],
 	"runArgs": [
 		"--privileged"
 	]

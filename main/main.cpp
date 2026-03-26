@@ -8,11 +8,11 @@
 #include <string.h>
 #include "nvs_flash.h"
 
-// условное вкдючение WiFi
-// #if defined(CONFIG_EXTERNAL_INTEGRATION_MQTT) || (defined(CONFIG_EXTERNAL_INTEGRATION_MATTER) && defined(CONFIG_ESP_WIFI_ENABLED))
+// условное включение WiFi
+#if defined(CONFIG_EXTERNAL_INTEGRATION_MQTT) || (defined(CONFIG_EXTERNAL_INTEGRATION_MATTER) && defined(CONFIG_ESP_WIFI_ENABLED))
 #define WIFI_INIT
 #include "wifi.h"
-// #endif
+#endif
 
 // Условные включения интеграций
 #ifdef CONFIG_EXTERNAL_INTEGRATION_MATTER
@@ -43,10 +43,10 @@ extern "C"
             return err;
         }
 
-        // #endif
-        // #ifdef WIFI_INIT
+// #endif
+#ifdef WIFI_INIT
         err = wifi_init();
-        // #endif
+#endif
         return ESP_OK;
     }
 
@@ -64,8 +64,8 @@ extern "C"
         ESP_ERROR_CHECK(init_network());
 
         // Инициализация компонентов
-        // ESP_LOGI(TAG, "Initializing controller...");
-        // controller_init();
+        ESP_LOGI(TAG, "Initializing controller...");
+        controller_init();
 
 #ifdef CONFIG_EXTERNAL_INTEGRATION_MATTER
         // Инициализация Matter интеграции
